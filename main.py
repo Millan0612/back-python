@@ -1,6 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
 from pydantic import BaseModel
 from typing import List
+import easyocr
+import shutil
+import os
 
 app = FastAPI()
 
@@ -42,4 +45,24 @@ def procesar_numeros(data: Numeros):
         "menor": min(nums),
         "promedio": sum(nums) / len(nums)
     }
+
 # --------------------------------------------------------------
+@app.post("/ocr")
+async def leer_texto_desde_imagen(archivo: UploadFile = File(...)):
+    # Guardar el archivo temporalmente
+    ruta_temporal = f"temp_{archivo.filename}"
+    with open(ruta_temporal, "wb") as buffer:
+        shutil.copyfileobj(archivo.file, buffer)
+
+    # Verificar que se haya guardado correctamente
+    if not os.path.isfile(ruta_temporal):
+        return {"error": "No se pudo guardar la imagen"}
+
+    # Leer la imagen con EasyOCR
+    lector = easyocr.Reader(['es'])  # Cambia 'es' por 'en' si tu texto está en inglés
+    resultado = lector.readtext(ruta_temporal, detail=0)
+
+    # Borrar la imagen temporal después de procesarla
+    os.remove(ruta_temporal)
+
+    return {"texto_detectado": resultado}
